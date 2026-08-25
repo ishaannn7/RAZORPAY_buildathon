@@ -16,7 +16,10 @@ from sqlalchemy.orm import Session
 
 from reconproof.config import Settings
 from reconproof.db.models import (
+    AccountingCheck,
     AuditEvent,
+    EvidenceItem,
+    MatchCandidate,
     ReconciliationBatch,
     ReconciliationException,
     ReconciliationMatch,
@@ -418,6 +421,78 @@ class TestDriftRestriction:
         pipeline._apply_drift_restriction(only, metrics)
         assert pipeline.policy.effective_max_risk == default_max_risk
         assert metrics.automation_restricted is False
+
+
+class TestPipelineFailureIsAtomic:
+    """A crash partway through run() must leave the database exactly as it was.
+
+    `run()` itself never commits; `POST /batches/{id}/run` owns the
+    transaction and rolls back on any exception before marking the batch
+    FAILED (see `api/routes/batches.py::run_batch`). That rollback is the
+    actual atomicity guarantee, and it has never been exercised by a test
+    that forces a failure after real writes have already happened — the
+    existing structural-ingestion tests only prove atomic rejection at the
+    file-parsing stage, before the pipeline runs at all.
+    """
+
+    def test_a_failure_after_persistence_leaves_no_partial_results(
+        self,
+        db: Session,
+        settings: Settings,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        batch, _truth = materialize_dataset(
+            db, DatasetSpec(name="atomic", seed=909, n_orders=200), tmp_path / "atomic"
+        )
+        # Commit a known-good baseline so the rollback below has a durable,
+        # disk-backed state to return to, not just an uncommitted flush.
+        db.commit()
+        assert batch.status is BatchStatus.READY
+        assert batch.started_at is None
+
+        # _create_exceptions is the last stage `run()` calls, after `_persist`
+        # has already flushed real MatchCandidate/ReconciliationMatch/
+        # EvidenceItem/AccountingCheck rows for this batch. Failing here is
+        # the strongest version of this test: those rows genuinely exist,
+        # uncommitted, in the transaction at the moment of the crash. The
+        # patch is deliberately signature-agnostic (`*args, **kwargs`) rather
+        # than typed against `_create_exceptions`'s params, since those are
+        # private and not part of any contract this test should couple to.
+        def _boom(self: ReconciliationPipeline, *args: object, **kwargs: object) -> None:
+            raise RuntimeError("injected failure: exception creation crashed")
+
+        monkeypatch.setattr(ReconciliationPipeline, "_create_exceptions", _boom)
+
+        pipeline = ReconciliationPipeline(db, settings=settings)
+        with pytest.raises(RuntimeError, match="injected failure"):
+            pipeline.run(batch)
+
+        # Prove the crash happened after real writes, not before them.
+        matches_before_rollback = db.execute(
+            select(func.count())
+            .select_from(ReconciliationMatch)
+            .where(ReconciliationMatch.batch_id == batch.id)
+        ).scalar_one()
+        assert matches_before_rollback > 0
+
+        # This is exactly what POST /batches/{id}/run does on any exception.
+        db.rollback()
+
+        for model in (
+            MatchCandidate,
+            ReconciliationMatch,
+            EvidenceItem,
+            AccountingCheck,
+            ReconciliationException,
+        ):
+            count = db.execute(
+                select(func.count()).select_from(model).where(model.batch_id == batch.id)
+            ).scalar_one()
+            assert count == 0, f"{model.__name__} rows survived a rolled-back run"
+
+        assert batch.status is BatchStatus.READY
+        assert batch.started_at is None
 
 
 class TestNormalization:
