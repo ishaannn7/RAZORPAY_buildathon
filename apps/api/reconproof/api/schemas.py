@@ -152,6 +152,22 @@ class MatchSummary(ApiModel):
     right: RecordSummary
 
 
+class FeatureContribution(BaseModel):
+    """One feature's signed push on this specific candidate's score.
+
+    Distinct from the model page's global coefficients: this is the
+    coefficient times *this candidate's* standardized value, so it answers
+    "what mattered for this one link" rather than "what the model weighs in
+    general."
+    """
+
+    feature: str
+    raw_value: float
+    standardized_value: float
+    coefficient: float
+    contribution: float
+
+
 class CandidateSummary(BaseModel):
     id: str
     relation: str
@@ -159,6 +175,7 @@ class CandidateSummary(BaseModel):
     score: float | None
     risk: float | None
     features: dict[str, float]
+    feature_contributions: list[FeatureContribution] = Field(default_factory=list)
     left: RecordSummary
     right: RecordSummary
     evidence: list[EvidenceSummary] = Field(default_factory=list)

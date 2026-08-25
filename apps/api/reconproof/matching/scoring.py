@@ -446,6 +446,42 @@ class CalibratedMatchScorer:
             for name, weight in zip(self.feature_names, model.coef_[0], strict=True)
         }
 
+    def contributions_for(self, feature_row: dict[str, float]) -> list[dict[str, float]]:
+        """Per-feature signed contribution to *this candidate's* logit.
+
+        The global `coefficients()` describe the model in general; this
+        answers the narrower question a reviewer actually has in front of one
+        candidate: which features pushed the score up, which pulled it down,
+        and by how much. Each feature's contribution is its standardized
+        coefficient times *this candidate's* standardized value — the same
+        decomposition the model's own linear form uses internally, so
+        `sum(contribution) + intercept` reproduces the model's logit exactly
+        (asserted in tests, not just claimed). Ranked by absolute
+        contribution, largest first, so the UI can show "what mattered most"
+        without the caller re-sorting.
+        """
+        if self.pipeline is None:
+            return []
+        scale = self.pipeline.named_steps["scale"]
+        model = self.pipeline.named_steps["model"]
+        raw = to_vector(feature_row)
+        standardized = scale.transform(np.asarray([raw], dtype=float))[0]
+        coefficients = model.coef_[0]
+        rows = [
+            {
+                "feature": name,
+                "raw_value": float(raw_value),
+                "standardized_value": float(standardized_value),
+                "coefficient": float(coefficient),
+                "contribution": float(coefficient * standardized_value),
+            }
+            for name, raw_value, standardized_value, coefficient in zip(
+                self.feature_names, raw, standardized, coefficients, strict=True
+            )
+        ]
+        rows.sort(key=lambda row: abs(row["contribution"]), reverse=True)
+        return rows
+
     def reliability(
         self, feature_rows: list[dict[str, float]], labels: list[int], bins: int = 10
     ) -> dict[str, Any]:

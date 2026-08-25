@@ -10,6 +10,7 @@ from reconproof.api.schemas import (
     CandidateSummary,
     CounterfactualSummary,
     EvidenceSummary,
+    FeatureContribution,
     GraphEdge,
     GraphNode,
     InvariantSummary,
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
         ReconciliationMatch,
         SourceRecord,
     )
+    from reconproof.matching.scoring import CalibratedMatchScorer
 
 
 def record_reference(record: SourceRecord) -> str | None:
@@ -104,14 +106,24 @@ def serialize_candidate(
     right: SourceRecord,
     evidence: list[EvidenceItem],
     checks: list[AccountingCheck],
+    scorer: CalibratedMatchScorer | None = None,
 ) -> CandidateSummary:
+    features = candidate.features or {}
+    contributions: list[FeatureContribution] = []
+    if scorer is not None and features:
+        # A candidate this old model never scored (e.g. a deterministic exact
+        # match with no learned features attached) has nothing to attribute —
+        # contributions_for would just report every feature at its default 0.0,
+        # which is misleading rather than merely empty, so skip it entirely.
+        contributions = [FeatureContribution(**row) for row in scorer.contributions_for(features)]
     return CandidateSummary(
         id=candidate.id,
         relation=candidate.relation.value,
         generator=candidate.generator,
         score=candidate.score,
         risk=candidate.risk,
-        features=candidate.features or {},
+        features=features,
+        feature_contributions=contributions,
         left=serialize_record(left),
         right=serialize_record(right),
         evidence=[serialize_evidence(item) for item in evidence],

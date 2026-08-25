@@ -118,6 +118,14 @@ export type InvariantSummary = {
   detail: Record<string, unknown>;
 };
 
+export type FeatureContribution = {
+  feature: string;
+  raw_value: number;
+  standardized_value: number;
+  coefficient: number;
+  contribution: number;
+};
+
 export type CandidateSummary = {
   id: string;
   relation: string;
@@ -125,6 +133,7 @@ export type CandidateSummary = {
   score: number | null;
   risk: number | null;
   features: Record<string, number>;
+  feature_contributions: FeatureContribution[];
   left: RecordSummary;
   right: RecordSummary;
   evidence: EvidenceSummary[];

@@ -22,6 +22,7 @@ from reconproof.api.serializers import (
     serialize_record,
 )
 from reconproof.audit.log import record as audit_record
+from reconproof.config import Settings, get_settings
 from reconproof.db.models import (
     AccountingCheck,
     AgentRun,
@@ -42,6 +43,7 @@ from reconproof.domain.entities import (
     MatchMethod,
 )
 from reconproof.learning.store import record_label
+from reconproof.runtime import load_active_scorer
 
 router = APIRouter(prefix="/exceptions", tags=["exceptions"])
 
@@ -124,8 +126,13 @@ def list_exceptions(
 
 
 @router.get("/{exception_id}", response_model=ExceptionDetail)
-def get_exception(exception_id: str, db: Annotated[Session, Depends(get_db)]) -> ExceptionDetail:
+def get_exception(
+    exception_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ExceptionDetail:
     item = _get_exception(db, exception_id)
+    scorer = load_active_scorer(settings)
     evidence = list(
         db.execute(select(EvidenceItem).where(EvidenceItem.exception_id == item.id)).scalars()
     )
@@ -176,6 +183,7 @@ def get_exception(exception_id: str, db: Annotated[Session, Depends(get_db)]) ->
             records[candidate.right_record_id],
             evidence_by_candidate.get(candidate.id, []),
             checks_by_candidate.get(candidate.id, []),
+            scorer,
         )
         for candidate in candidates
         if candidate.left_record_id in records and candidate.right_record_id in records
@@ -209,6 +217,7 @@ def resolve_exception(
     exception_id: str,
     payload: ResolveRequest,
     db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ExceptionDetail:
     """Record a human decision and, where one was chosen, post the match.
 
@@ -334,4 +343,4 @@ def resolve_exception(
         message=f"{payload.reviewer} {payload.action} exception {item.id}",
     )
     db.commit()
-    return get_exception(exception_id, db)
+    return get_exception(exception_id, db, settings)

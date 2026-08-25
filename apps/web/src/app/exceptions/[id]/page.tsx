@@ -5,6 +5,7 @@ import { AgentTrace } from "@/components/agent-trace";
 import { ExceptionActions } from "@/components/exception-actions";
 import {
   Badge,
+  Bar,
   Card,
   CardBody,
   CardHeader,
@@ -385,6 +386,47 @@ function CandidatePanel({
           },
         )}
       </div>
+
+      {candidate.feature_contributions.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-line bg-surface-2/40 px-3 py-2.5">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+            Why this score — top contributing features
+          </div>
+          <div className="flex flex-col gap-2">
+            {(() => {
+              const top = candidate.feature_contributions.slice(0, 6);
+              const maxMagnitude = Math.max(
+                ...top.map((entry) => Math.abs(entry.contribution)),
+                1e-9,
+              );
+              return top.map((entry) => (
+                <div key={entry.feature}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[11px] text-ink-2">
+                      {entry.feature.replace(/_/g, " ")}
+                    </span>
+                    <span className="tabular text-[11px] text-ink-3">
+                      {entry.contribution > 0 ? "+" : ""}
+                      {entry.contribution.toFixed(3)}
+                    </span>
+                  </div>
+                  <div className="mt-0.5">
+                    <Bar
+                      value={Math.abs(entry.contribution) / maxMagnitude}
+                      tone={entry.contribution > 0 ? "proven" : "blocked"}
+                      label={`${entry.feature} contribution ${entry.contribution.toFixed(3)}`}
+                    />
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
+            This candidate&apos;s standardized feature values times the active model&apos;s
+            coefficients — positive pushes the score up, negative pulls it down.
+          </p>
+        </div>
+      ) : null}
 
       {candidate.evidence.length > 0 ? (
         <ul className="mt-3 flex flex-col gap-1">
