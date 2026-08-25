@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# ReconProof runtime state (database, uploads, model artifacts)
+.reconproof/
+*.db
+*.db-wal
+*.db-shm
+
+# Generated datasets are reproducible from a seed; only the spec is tracked.
+datasets/*/
+!datasets/.gitkeep
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+
+*.zip
+*.bundle

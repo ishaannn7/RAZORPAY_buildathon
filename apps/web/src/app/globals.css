@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/*
+  A finance tool is read for hours at a time, so the palette is low-chroma and
+  the type scale is tight. Semantic colours carry meaning that must survive a
+  colourblind reader, so every use of them in the UI is paired with a label or
+  an icon rather than standing alone.
+*/
+@theme {
+  --color-canvas: oklch(0.16 0.012 260);
+  --color-surface: oklch(0.2 0.014 260);
+  --color-surface-2: oklch(0.24 0.016 260);
+  --color-surface-3: oklch(0.28 0.018 260);
+  --color-line: oklch(0.32 0.018 260);
+  --color-line-strong: oklch(0.42 0.02 260);
+
+  --color-ink: oklch(0.96 0.005 260);
+  --color-ink-2: oklch(0.78 0.012 260);
+  --color-ink-3: oklch(0.62 0.014 260);
+
+  --color-accent: oklch(0.72 0.14 235);
+  --color-accent-soft: oklch(0.3 0.06 235);
+
+  --color-proven: oklch(0.74 0.15 155);
+  --color-proven-soft: oklch(0.28 0.06 155);
+  --color-review: oklch(0.8 0.14 85);
+  --color-review-soft: oklch(0.3 0.06 85);
+  --color-blocked: oklch(0.68 0.17 25);
+  --color-blocked-soft: oklch(0.28 0.07 25);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Monetary figures are compared column-to-column, so digits must not shift. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-canvas);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-3);
+  border-radius: 6px;
+  border: 2px solid var(--color-canvas);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-line-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

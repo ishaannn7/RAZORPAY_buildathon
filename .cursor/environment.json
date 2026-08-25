@@ -1,0 +1,17 @@
+{
+  "name": "ReconProof Buildathon",
+  "repositoryDependencies": [
+    "github.com/ishaannn7/RAZORPAY_buildathon"
+  ],
+  "install": "make setup",
+  "terminals": [
+    {
+      "name": "api",
+      "command": "make api"
+    },
+    {
+      "name": "web",
+      "command": "make web"
+    }
+  ]
+}
