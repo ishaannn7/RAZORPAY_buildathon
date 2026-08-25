@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { BatchNav } from "@/components/batch-nav";
+import { ExportLinks } from "@/components/export-links";
 import {
   Badge,
   Card,
@@ -13,7 +14,7 @@ import {
   Td,
   Th,
 } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, API_BASE } from "@/lib/api";
 import {
   dateOnly,
   METHOD_LABELS,
@@ -54,20 +55,25 @@ export default async function MatchesPage({
           title="Decided links"
           description="Each row records how the decision was reached and which checks it satisfied."
           action={
-            <div className="flex flex-wrap gap-1">
-              {DECISIONS.map((option) => (
-                <NavLink
-                  key={option.key}
-                  href={
-                    option.key
-                      ? `/batches/${id}/matches?decision=${option.key}`
-                      : `/batches/${id}/matches`
-                  }
-                  active={decision === option.key}
-                >
-                  {option.label}
-                </NavLink>
-              ))}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-1">
+                {DECISIONS.map((option) => (
+                  <NavLink
+                    key={option.key}
+                    href={
+                      option.key
+                        ? `/batches/${id}/matches?decision=${option.key}`
+                        : `/batches/${id}/matches`
+                    }
+                    active={decision === option.key}
+                  >
+                    {option.label}
+                  </NavLink>
+                ))}
+              </div>
+              <ExportLinks
+                href={`${API_BASE}/api/batches/${id}/export/matches${decision ? `?decision=${decision}` : ""}`}
+              />
             </div>
           }
         />

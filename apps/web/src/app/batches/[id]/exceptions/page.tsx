@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BatchNav } from "@/components/batch-nav";
+import { ExportLinks } from "@/components/export-links";
 import {
   Badge,
   Card,
@@ -39,12 +40,7 @@ export default async function ExceptionQueuePage({
           title="Exception queue"
           description="Work the pipeline could not prove. Every item carries the amount it leaves unexplained, and the sum of those amounts equals the batch's unexplained total."
           action={
-            <a
-              href={`${API_BASE}/api/batches/${id}/export/exceptions`}
-              className="rounded-md border border-line-strong bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink"
-            >
-              Export CSV
-            </a>
+            <ExportLinks href={`${API_BASE}/api/batches/${id}/export/exceptions`} />
           }
         />
         {!exceptions || exceptions.length === 0 ? (

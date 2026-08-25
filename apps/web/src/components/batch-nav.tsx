@@ -9,7 +9,14 @@ export function BatchNav({
   active,
 }: {
   batch: BatchDetail;
-  active: "overview" | "exceptions" | "matches" | "graph" | "audit" | "health";
+  active:
+    | "overview"
+    | "exceptions"
+    | "matches"
+    | "graph"
+    | "audit"
+    | "health"
+    | "summary";
 }) {
   const base = `/batches/${batch.id}`;
   return (
@@ -51,6 +58,9 @@ export function BatchNav({
         </NavLink>
         <NavLink href={`${base}/audit`} active={active === "audit"}>
           Audit trail
+        </NavLink>
+        <NavLink href={`${base}/summary`} active={active === "summary"}>
+          Summary
         </NavLink>
       </nav>
     </div>

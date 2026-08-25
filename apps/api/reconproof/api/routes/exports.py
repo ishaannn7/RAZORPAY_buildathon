@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import Annotated, Any
+import json
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -47,6 +48,9 @@ def _safe(value: Any) -> str:
     return text
 
 
+ExportFormat = Literal["csv", "json"]
+
+
 def _csv_response(
     rows: list[dict[str, Any]], columns: list[str], filename: str
 ) -> StreamingResponse:
@@ -63,6 +67,31 @@ def _csv_response(
     )
 
 
+def _json_response(rows: list[dict[str, Any]], columns: list[str], filename: str) -> Response:
+    """The same rows as the CSV export, as a JSON array.
+
+    No formula-injection neutralization here — that guard exists because a
+    leading ``=``/``+``/``@`` executes when a *spreadsheet* opens the cell; a
+    JSON consumer never interprets a string that way, so applying `_safe`
+    would just corrupt values (e.g. prefixing a genuine reference like
+    ``=REFUND-1`` with a stray apostrophe) for no protective benefit.
+    """
+    payload = [{column: row.get(column) for column in columns} for row in rows]
+    return Response(
+        content=json.dumps(payload, indent=2, default=str),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _export_response(
+    rows: list[dict[str, Any]], columns: list[str], stem: str, export_format: ExportFormat
+) -> Response:
+    if export_format == "json":
+        return _json_response(rows, columns, f"{stem}.json")
+    return _csv_response(rows, columns, f"{stem}.csv")
+
+
 def _get_batch(db: Session, batch_id: str) -> ReconciliationBatch:
     batch = db.get(ReconciliationBatch, batch_id)
     if batch is None:
@@ -74,7 +103,8 @@ def _get_batch(db: Session, batch_id: str) -> ReconciliationBatch:
 def export_exceptions(
     batch_id: str,
     db: Annotated[Session, Depends(get_db)],
-) -> StreamingResponse:
+    format: Annotated[ExportFormat, Query()] = "csv",
+) -> Response:
     """The exception report: everything left unexplained, with its amount."""
     batch = _get_batch(db, batch_id)
     items = list(
@@ -129,12 +159,12 @@ def export_exceptions(
         action=AuditAction.EXPORT_GENERATED,
         actor=Actor.HUMAN,
         batch_id=batch.id,
-        detail={"report": "exceptions", "rows": len(rows)},
-        message=f"Exception report exported ({len(rows)} rows)",
+        detail={"report": "exceptions", "rows": len(rows), "format": format},
+        message=f"Exception report exported ({len(rows)} rows, {format})",
     )
     db.commit()
 
-    return _csv_response(
+    return _export_response(
         rows,
         [
             "exception_id",
@@ -152,7 +182,8 @@ def export_exceptions(
             "summary",
             "explanation",
         ],
-        f"reconproof-exceptions-{batch.name}.csv",
+        f"reconproof-exceptions-{batch.name}",
+        format,
     )
 
 
@@ -161,7 +192,8 @@ def export_matches(
     batch_id: str,
     db: Annotated[Session, Depends(get_db)],
     decision: Annotated[str | None, Query()] = None,
-) -> StreamingResponse:
+    format: Annotated[ExportFormat, Query()] = "csv",
+) -> Response:
     """The reconciled ledger, with how each link was decided."""
     batch = _get_batch(db, batch_id)
     statement = select(ReconciliationMatch).where(ReconciliationMatch.batch_id == batch_id)
@@ -226,12 +258,12 @@ def export_matches(
         action=AuditAction.EXPORT_GENERATED,
         actor=Actor.HUMAN,
         batch_id=batch.id,
-        detail={"report": "matches", "rows": len(rows), "decision": decision},
-        message=f"Match report exported ({len(rows)} rows)",
+        detail={"report": "matches", "rows": len(rows), "decision": decision, "format": format},
+        message=f"Match report exported ({len(rows)} rows, {format})",
     )
     db.commit()
 
-    return _csv_response(
+    return _export_response(
         rows,
         [
             "match_id",
@@ -250,7 +282,8 @@ def export_matches(
             "checks_failed",
             "rationale",
         ],
-        f"reconproof-matches-{batch.name}.csv",
+        f"reconproof-matches-{batch.name}",
+        format,
     )
 
 
@@ -258,7 +291,8 @@ def export_matches(
 def export_audit(
     batch_id: str,
     db: Annotated[Session, Depends(get_db)],
-) -> StreamingResponse:
+    format: Annotated[ExportFormat, Query()] = "csv",
+) -> Response:
     """The audit package: the full decision history for this batch."""
     batch = _get_batch(db, batch_id)
     events = list(
@@ -282,7 +316,7 @@ def export_audit(
         }
         for event in events
     ]
-    return _csv_response(
+    return _export_response(
         rows,
         [
             "sequence",
@@ -297,5 +331,6 @@ def export_audit(
             "policy_version_id",
             "message",
         ],
-        f"reconproof-audit-{batch.name}.csv",
+        f"reconproof-audit-{batch.name}",
+        format,
     )

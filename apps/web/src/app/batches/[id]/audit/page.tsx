@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { BatchNav } from "@/components/batch-nav";
+import { ExportLinks } from "@/components/export-links";
 import {
   Badge,
   Card,
@@ -44,12 +45,10 @@ export default async function AuditPage({
           title="Audit trail"
           description="Append-only and contiguously sequenced. Agents are never recorded as humans, so an approved link is always distinguishable from an automatic one."
           action={
-            <a
+            <ExportLinks
               href={`${API_BASE}/api/batches/${id}/export/audit`}
-              className="rounded-md border border-line-strong bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink"
-            >
-              Export audit package
-            </a>
+              label="Export audit package"
+            />
           }
         />
         {!entries || entries.length === 0 ? (
