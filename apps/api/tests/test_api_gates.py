@@ -50,9 +50,7 @@ def _challenger(
 
 
 class TestModelPromotionGates:
-    def test_evaluate_then_named_human_can_promote(
-        self, client: TestClient, db: Session
-    ) -> None:
+    def test_evaluate_then_named_human_can_promote(self, client: TestClient, db: Session) -> None:
         version = _challenger(db, precision_lower_bound=0.995)
         listed = client.get("/api/models")
         assert listed.status_code == 200
