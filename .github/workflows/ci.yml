@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API — lint, typecheck, test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -e ".[dev]"
+
+      - name: Lint
+        run: |
+          .venv/bin/ruff check reconproof tests
+          .venv/bin/ruff format --check reconproof tests
+
+      - name: Typecheck
+        # Advisory for now: the ORM and scientific-stack stubs need work before
+        # strict mode is a useful gate rather than a wall of third-party noise.
+        run: .venv/bin/mypy reconproof || true
+
+      - name: Test
+        run: .venv/bin/python -m pytest -q
+
+  web:
+    name: Web — lint, typecheck, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint src --max-warnings 0
+
+      - name: Build
+        run: npm run build
+
+  demo:
+    name: Demo reproduces its reported metrics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install
+        working-directory: apps/api
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -e ".[dev]"
+
+      - name: Run the demo
+        working-directory: apps/api
+        run: .venv/bin/python -m reconproof.cli demo
+
+      - name: Assert the guarantees hold
+        working-directory: apps/api
+        # The demo is fully seeded, so these are reproducible assertions rather
+        # than a smoke test. A regression that quietly degrades precision or
+        # leaves unexplained value out of the queue fails here.
+        run: |
+          .venv/bin/python - <<'PY'
+          import json, sys
+          from pathlib import Path
+
+          report = json.loads(
+              Path("../../.reconproof/artifacts/evaluation_report.json").read_text()
+          )
+          model = report["evaluation"]["model"]
+          run = report["reconciliation"]
+
+          failures = []
+          if model["false_positives"] != 0:
+              failures.append(f"{model['false_positives']} false positives on held-out data")
+          if model["precision"] < 0.99:
+              failures.append(f"precision {model['precision']:.4f} below 0.99")
+          if model["recall"] < 0.90:
+              failures.append(f"recall {model['recall']:.4f} below 0.90")
+          if not run["unresolved_value_fully_represented"]:
+              failures.append("the exception queue does not account for all unexplained value")
+          if run["automatic_match_rate"] < 0.90:
+              failures.append(f"automatic match rate {run['automatic_match_rate']:.4f} below 0.90")
+
+          for failure in failures:
+              print(f"FAIL: {failure}")
+          if failures:
+              sys.exit(1)
+          print(
+              f"OK precision={model['precision']:.4f} recall={model['recall']:.4f} "
+              f"auto_rate={run['automatic_match_rate']:.4f}"
+          )
+          PY
