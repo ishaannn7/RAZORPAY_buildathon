@@ -217,8 +217,8 @@ def resolve_exception(
     reviewer either approves here or overrides.
     """
     item = _get_exception(db, exception_id)
-    if item.status is ExceptionStatus.RESOLVED:
-        raise HTTPException(status_code=409, detail="exception is already resolved")
+    if item.status in (ExceptionStatus.RESOLVED, ExceptionStatus.WRITTEN_OFF):
+        raise HTTPException(status_code=409, detail=f"exception is already {item.status.value}")
 
     run = _latest_agent_run(db, item.id)
     recommended_candidate = None

@@ -28,6 +28,23 @@ make web       # terminal 2 → http://127.0.0.1:43917
 
 `make demo` is fully seeded. The numbers below reproduce exactly.
 
+### Or with Docker Compose
+
+Neither path requires Docker, and this one changes nothing about the defaults —
+same SQLite database, same no-LLM fallback, same no-network-at-runtime posture,
+just packaged as two containers instead of a local venv and `node_modules`.
+
+```bash
+docker compose up --build
+docker compose exec api reconproof demo   # seed the held-out demo dataset
+```
+
+Then open http://localhost:43917. `docker-compose.yml` has no Postgres service
+yet — `RECONPROOF_DATABASE_URL` is a straight SQLAlchemy URL, so pointing it at
+a real Postgres just needs a driver added to `apps/api/pyproject.toml` and a
+service added to the compose file; today's default keeps to what's actually
+tested.
+
 ---
 
 ## What it does

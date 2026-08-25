@@ -31,6 +31,7 @@ from reconproof.agent.providers.deterministic import DeterministicProvider
 from reconproof.agent.tools import InvestigationTools, ToolDenied
 from reconproof.config import Settings
 from reconproof.db.models import (
+    AgentRun,
     AuditEvent,
     MatchCandidate,
     ReconciliationException,
@@ -150,6 +151,22 @@ class AlwaysFails(_Base):
 
     def critique(self, brief: InvestigationBrief, hypothesis: Hypothesis) -> Critique:
         return Critique(should_abstain=True, reason="provider unavailable")
+
+
+class RaisesLikeATimeout(_Base):
+    """Simulates the provider transport failing mid-call, e.g. an HTTP timeout.
+
+    `AlwaysFails` covers a provider that answers "I have nothing" cleanly.
+    This is the less polite case: the network call itself blows up, which is
+    what a real `httpx.TimeoutException` from the Ollama provider looks like
+    to `Investigator.investigate`. It must be caught the same way any other
+    provider misbehaviour is, not left to propagate out of the investigation.
+    """
+
+    name = "raises-timeout"
+
+    def hypothesize(self, brief: InvestigationBrief) -> Hypothesis | None:
+        raise TimeoutError("simulated provider timeout")
 
 
 class ObeysInjectedInstructions(_Base):
@@ -427,6 +444,19 @@ class TestProviderFailure:
             ExceptionStatus.AWAITING_APPROVAL,
         }
 
+    def test_provider_raising_mid_call_is_caught_not_propagated(
+        self, db: Session, settings: Settings, reconciled_batch: str
+    ) -> None:
+        """A timed-out provider must abstain safely, not crash the investigation."""
+        outcome, exception = _run(db, settings, reconciled_batch, RaisesLikeATimeout())
+        assert outcome.outcome is AgentOutcome.TOOL_FAILURE  # type: ignore[attr-defined]
+        assert outcome.recommendation is None  # type: ignore[attr-defined]
+        assert exception.status is ExceptionStatus.OPEN
+        # The failure itself is on the record, not silently dropped.
+        run = db.get(AgentRun, outcome.run_id)  # type: ignore[attr-defined]
+        assert run is not None
+        assert run.abstain_reason and "simulated provider timeout" in run.abstain_reason
+
     def test_agent_failure_never_corrupts_the_ledger(
         self, db: Session, settings: Settings, reconciled_batch: str
     ) -> None:
@@ -450,6 +480,7 @@ class TestProviderFailure:
             ClaimsCertaintyWithoutEvidence(),
             ObeysInjectedInstructions(),
             AlwaysFails(),
+            RaisesLikeATimeout(),
         ):
             _run(db, settings, reconciled_batch, provider)
 

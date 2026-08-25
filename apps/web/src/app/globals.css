@@ -28,7 +28,7 @@
   --color-blocked: oklch(0.68 0.17 25);
   --color-blocked-soft: oklch(0.28 0.07 25);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 

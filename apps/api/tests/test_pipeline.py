@@ -31,7 +31,7 @@ from reconproof.domain.entities import (
 )
 from reconproof.ingest.loader import StructuralIngestError, ingest_file
 from reconproof.learning.training import materialize_dataset
-from reconproof.pipeline import ReconciliationPipeline
+from reconproof.pipeline import ReconciliationMetrics, ReconciliationPipeline
 from reconproof.synthetic.generator import DatasetSpec, write_dataset
 
 
@@ -290,6 +290,134 @@ class TestIngestionSafety:
                 filename="empty.csv",
                 payload=b"",
             )
+
+
+class TestIngestionOrderIndependence:
+    def test_ingestion_order_does_not_affect_the_result(
+        self, db: Session, settings: Settings, tmp_path: Path
+    ) -> None:
+        """A payment referencing a not-yet-uploaded settlement must still resolve.
+
+        Nothing about the pipeline should assume sources arrive in a particular
+        sequence — a settlement export landing before the payments it settles,
+        or a refund file uploaded before the payment it refunds, is routine, not
+        exceptional. Two batches built from the same records in opposite file
+        orders must reconcile identically.
+        """
+        directory = tmp_path / "order"
+        write_dataset(DatasetSpec(name="order", seed=606, n_orders=250), directory)
+        kinds = [kind for kind in SourceKind if (directory / f"{kind.value}.csv").exists()]
+        assert len(kinds) >= 2, "the fixture needs at least two source files to prove order"
+
+        outcomes = []
+        for label, ordered_kinds in (("forward", kinds), ("reverse", list(reversed(kinds)))):
+            batch = ReconciliationBatch(
+                name=f"order-{label}", status=BatchStatus.READY, currency="INR"
+            )
+            db.add(batch)
+            db.flush()
+            for kind in ordered_kinds:
+                path = directory / f"{kind.value}.csv"
+                ingest_file(
+                    db,
+                    batch=batch,
+                    source_kind=kind,
+                    filename=path.name,
+                    payload=path.read_bytes(),
+                )
+            result = ReconciliationPipeline(db, settings=settings).run(batch)
+            db.commit()
+            outcomes.append(
+                (
+                    result.metrics.total_records,
+                    result.metrics.exact_links,
+                    result.metrics.auto_accepted,
+                    result.metrics.sent_to_review,
+                    result.metrics.rejected_by_invariant,
+                    result.metrics.unexplained_subunits,
+                    result.metrics.balanced_settlements,
+                )
+            )
+        assert outcomes[0] == outcomes[1]
+
+
+class TestDriftRestriction:
+    """The drift monitor only *flags* a batch; a later run is what must act on it."""
+
+    def test_restriction_carries_into_the_next_batch_only(
+        self, db: Session, settings: Settings, tmp_path: Path
+    ) -> None:
+        earlier, _ = materialize_dataset(
+            db, DatasetSpec(name="drift-a", seed=701, n_orders=120), tmp_path / "drift-a"
+        )
+        ReconciliationPipeline(db, settings=settings).run(earlier)
+        # Simulate what POST /batches/{id}/analyze would have set on `earlier`
+        # after detecting drift against whatever came before it. The detector
+        # itself (population_stability_index) is exercised separately; this
+        # test is about what a later run does with the flag once it is set.
+        earlier.automation_restricted = True
+        earlier.restriction_reason = "test: simulated drift"
+        db.commit()
+
+        later, _ = materialize_dataset(
+            db, DatasetSpec(name="drift-b", seed=702, n_orders=120), tmp_path / "drift-b"
+        )
+        pipeline = ReconciliationPipeline(db, settings=settings)
+        default_max_risk = pipeline.policy.effective_max_risk
+        result = pipeline.run(later)
+        db.commit()
+
+        assert pipeline.policy.effective_max_risk < default_max_risk
+        assert later.automation_restricted is True
+        assert later.restriction_reason is not None
+        assert result.metrics.automation_restricted is True
+
+        carried_events = list(
+            db.execute(
+                select(AuditEvent).where(
+                    AuditEvent.batch_id == later.id,
+                    AuditEvent.action == AuditAction.AUTOMATION_RESTRICTED,
+                )
+            ).scalars()
+        )
+        assert len(carried_events) == 1
+        assert carried_events[0].detail is not None
+        assert carried_events[0].detail.get("carried_from_batch_id") == earlier.id
+
+    def test_an_unrestricted_batch_does_not_carry_a_restriction(
+        self, db: Session, settings: Settings, tmp_path: Path
+    ) -> None:
+        clean, _ = materialize_dataset(
+            db, DatasetSpec(name="clean-a", seed=703, n_orders=120), tmp_path / "clean-a"
+        )
+        ReconciliationPipeline(db, settings=settings).run(clean)
+        db.commit()
+        assert clean.automation_restricted is False
+
+        later, _ = materialize_dataset(
+            db, DatasetSpec(name="clean-b", seed=704, n_orders=120), tmp_path / "clean-b"
+        )
+        pipeline = ReconciliationPipeline(db, settings=settings)
+        default_max_risk = pipeline.policy.effective_max_risk
+        result = pipeline.run(later)
+        db.commit()
+
+        assert pipeline.policy.effective_max_risk == default_max_risk
+        assert later.automation_restricted is False
+        assert result.metrics.automation_restricted is False
+
+    def test_apply_drift_restriction_is_a_no_op_with_no_prior_batch(
+        self, db: Session, settings: Settings
+    ) -> None:
+        only = ReconciliationBatch(name="only", status=BatchStatus.READY, currency="INR")
+        db.add(only)
+        db.flush()
+        pipeline = ReconciliationPipeline(db, settings=settings)
+        default_max_risk = pipeline.policy.effective_max_risk
+        metrics = ReconciliationMetrics()
+        pipeline._apply_drift_restriction(only, metrics)
+        assert pipeline.policy.effective_max_risk == default_max_risk
+        assert metrics.automation_restricted is False
 
 
 class TestNormalization:

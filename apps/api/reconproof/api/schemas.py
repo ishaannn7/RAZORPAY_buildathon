@@ -370,6 +370,21 @@ class ModelVersionSummary(ApiModel):
     coverage: float | None = None
 
 
+class PolicyVersionSummary(ApiModel):
+    id: str
+    name: str
+    version: str
+    document_sha256: str
+    active: bool
+    notes: str | None = None
+    created_at: datetime
+    #: The full document, not just the fields `/api/config` curates for the
+    #: active policy. A reviewer or auditor comparing two versions needs the
+    #: agent tool allowlist, review rules and drift settings, not only the
+    #: automation threshold.
+    document: dict[str, Any] = Field(default_factory=dict)
+
+
 class HealthResponse(BaseModel):
     status: str
     database: str

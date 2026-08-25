@@ -1,17 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import Link from "next/link";
 
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui";
 
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "ReconProof — evidence-linked reconciliation",
@@ -60,7 +53,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en">
       <body className="min-h-screen antialiased">
         <div className="flex min-h-screen flex-col">
           <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur">
@@ -97,6 +90,12 @@ export default function RootLayout({
                   className="text-xs font-medium text-ink-3 transition-colors hover:text-ink"
                 >
                   Model &amp; policy
+                </Link>
+                <Link
+                  href="/settings"
+                  className="hidden text-xs font-medium text-ink-3 transition-colors hover:text-ink sm:inline"
+                >
+                  Settings
                 </Link>
                 <ProviderPill />
               </nav>

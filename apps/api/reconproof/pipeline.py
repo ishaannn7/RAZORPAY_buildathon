@@ -169,6 +169,8 @@ class ReconciliationPipeline:
             message=f"Reconciliation run started for batch {batch.name}",
         )
 
+        self._apply_drift_restriction(batch, metrics)
+
         records = list(
             self.session.execute(
                 select(SourceRecord).where(SourceRecord.batch_id == batch.id)
@@ -238,6 +240,61 @@ class ReconciliationPipeline:
             accepted=decision.accepted,
             review=decision.review,
             exceptions=decision.exception_ids,
+        )
+
+    # -- drift --------------------------------------------------------------
+
+    def _apply_drift_restriction(
+        self, batch: ReconciliationBatch, metrics: ReconciliationMetrics
+    ) -> None:
+        """Carry a drift restriction from the last batch into this run's policy.
+
+        `POST /batches/{id}/analyze` is what *detects* drift, and it can only
+        compare a batch against data that already exists — so it flags the
+        batch it ran against, not the one that will fix it. What a *new* run
+        can act on is what the immediately preceding batch found. One
+        generation of carry-forward: if that batch's own analysis later shows
+        no drift, the restriction is not renewed and clears on its own,
+        exactly the way `reference_batch` lookups work everywhere else in this
+        codebase (see `monitoring/drift.py::evaluate`).
+        """
+        previous = (
+            self.session.execute(
+                select(ReconciliationBatch)
+                .where(
+                    ReconciliationBatch.id != batch.id,
+                    ReconciliationBatch.created_at < batch.created_at,
+                )
+                .order_by(ReconciliationBatch.created_at.desc())
+                .limit(1)
+            )
+            .scalars()
+            .first()
+        )
+        if previous is None or not previous.automation_restricted:
+            return
+
+        self.policy.tighten_for_drift()
+        reason = (
+            f"Automation tightened to a risk budget of {self.policy.effective_max_risk:.4f} "
+            f"because the previous batch '{previous.name}' detected drift and has not yet "
+            "been cleared by a batch that shows none."
+        )
+        batch.automation_restricted = True
+        batch.restriction_reason = reason
+        metrics.automation_restricted = True
+        metrics.restriction_reason = reason
+
+        audit_record(
+            self.session,
+            action=AuditAction.AUTOMATION_RESTRICTED,
+            actor=Actor.SYSTEM,
+            batch_id=batch.id,
+            detail={
+                "carried_from_batch_id": previous.id,
+                "effective_max_risk": self.policy.effective_max_risk,
+            },
+            message=reason,
         )
 
     # -- stages ------------------------------------------------------------

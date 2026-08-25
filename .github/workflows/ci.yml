@@ -133,3 +133,45 @@ jobs:
               f"auto_rate={run['automatic_match_rate']:.4f}"
           )
           PY
+
+  docker:
+    name: Docker Compose stack builds and serves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: docker compose build
+
+      - name: Start
+        run: docker compose up -d
+
+      - name: Wait for the API to report healthy
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q api)" 2>/dev/null || echo "starting")
+            if [ "$status" = "healthy" ]; then
+              echo "API is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not become healthy in time"
+          docker compose logs api
+          exit 1
+
+      - name: Seed the demo dataset inside the running api container
+        run: docker compose exec -T api reconproof demo --scale 0.1
+
+      - name: Hit the API and the web app from the host
+        run: |
+          curl -sf http://localhost:8817/api/health
+          curl -sf http://localhost:43917/ > /dev/null
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

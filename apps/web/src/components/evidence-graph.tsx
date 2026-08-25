@@ -35,8 +35,15 @@ const DECISION_STROKE: Record<string, string> = {
   rejected: "var(--color-blocked)",
 };
 
-export function EvidenceGraph({ graph }: { graph: GraphResponse }) {
-  const [selected, setSelected] = useState<string | null>(null);
+export function EvidenceGraph({
+  graph,
+  initialFocusId,
+}: {
+  graph: GraphResponse;
+  /** Pre-select a record, e.g. when arriving from that record's exception page. */
+  initialFocusId?: string | null;
+}) {
+  const [selected, setSelected] = useState<string | null>(initialFocusId ?? null);
 
   const layout = useMemo(() => buildLayout(graph), [graph]);
 

@@ -307,6 +307,39 @@ export type HealthResponse = {
   version: string;
 };
 
+export type PolicyAgentRules = {
+  max_iterations: number;
+  max_tool_calls: number;
+  max_output_retries: number;
+  allowed_tools: string[];
+  recommendation_requires_human_approval: boolean;
+  min_cited_evidence: number;
+  max_rows_per_search: number;
+};
+
+export type PolicyReviewRules = {
+  force_on_tie: boolean;
+  force_on_advisory_failure: boolean;
+  force_when_competing_candidates_above: number;
+};
+
+export type PolicyDriftRules = {
+  psi_threshold: number;
+  on_detection: string;
+  risk_tightening_factor: number;
+};
+
+export type PolicyVersionSummary = {
+  id: string;
+  name: string;
+  version: string;
+  document_sha256: string;
+  active: boolean;
+  notes: string | null;
+  created_at: string;
+  document: Record<string, unknown>;
+};
+
 export type RuntimeConfig = {
   target_precision: number;
   risk_budget: number;
@@ -316,6 +349,9 @@ export type RuntimeConfig = {
     digest: string;
     max_risk: number;
     high_value_review_subunits: number;
+    agent: PolicyAgentRules;
+    review: PolicyReviewRules;
+    drift: PolicyDriftRules;
   };
   scorer: {
     trained: boolean;
@@ -446,4 +482,5 @@ export const api = {
     apiFetchSafe<BriefingSummary[]>(`/api/agent/briefing/${id}`),
   labels: () => apiFetchSafe<Record<string, unknown>>("/api/models/labels"),
   models: () => apiFetchSafe<ModelVersionSummary[]>("/api/models"),
+  policies: () => apiFetchSafe<PolicyVersionSummary[]>("/api/policies"),
 };

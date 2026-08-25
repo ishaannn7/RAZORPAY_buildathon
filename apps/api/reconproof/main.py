@@ -12,7 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from reconproof.api.routes import agent, batches, exceptions, exports, models, monitoring
+from reconproof.api.routes import (
+    agent,
+    batches,
+    exceptions,
+    exports,
+    models,
+    monitoring,
+    policies,
+)
 from reconproof.api.schemas import HealthResponse
 from reconproof.config import Settings, get_settings
 from reconproof.db.models import ModelVersion
@@ -68,6 +76,7 @@ def create_app() -> FastAPI:
     app.include_router(agent.router, prefix="/api")
     app.include_router(monitoring.router, prefix="/api")
     app.include_router(models.router, prefix="/api")
+    app.include_router(policies.router, prefix="/api")
 
     @app.get("/api/health", response_model=HealthResponse, tags=["meta"])
     def health(
@@ -121,6 +130,13 @@ def create_app() -> FastAPI:
                 "high_value_review_subunits": policy.document["automation"][
                     "high_value_review_subunits"
                 ],
+                # The full agent and review sub-documents, not just the
+                # automation threshold: a reviewer checking what the agent is
+                # permitted to do needs the tool allowlist and iteration
+                # limits on the same page as the acceptance threshold.
+                "agent": policy.document["agent"],
+                "review": policy.document["review"],
+                "drift": policy.document["drift"],
             },
             "scorer": scorer_summary(config),
             "llm": describe_provider(config),

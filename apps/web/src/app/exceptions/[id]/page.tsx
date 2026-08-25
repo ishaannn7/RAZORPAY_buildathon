@@ -77,6 +77,14 @@ export default async function ExceptionReviewPage({
             <CardHeader
               title="Subject record"
               description="Shown exactly as ingested. Source values are never edited."
+              action={
+                <Link
+                  href={`/batches/${exception.batch_id}/graph?focus=${exception.subject.id}`}
+                  className="text-xs font-medium text-accent hover:underline"
+                >
+                  View in evidence graph →
+                </Link>
+              }
             />
             <CardBody>
               <RecordPanel record={exception.subject} />
@@ -333,6 +341,7 @@ function CandidatePanel({
   recommended: boolean;
 }) {
   const failing = candidate.invariants.filter((check) => !check.passed);
+  const passing = candidate.invariants.filter((check) => check.passed);
   return (
     <div className="px-5 py-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -391,6 +400,20 @@ function CandidatePanel({
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {passing.length > 0 || failing.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {passing.map((check) => (
+            <Badge
+              key={check.invariant}
+              tone="proven"
+              title={check.message ?? undefined}
+            >
+              ✓ {check.invariant.replace(/_/g, " ")}
+            </Badge>
+          ))}
+        </div>
       ) : null}
 
       {failing.length > 0 ? (

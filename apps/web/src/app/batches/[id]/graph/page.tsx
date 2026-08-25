@@ -10,10 +10,13 @@ export const dynamic = "force-dynamic";
 
 export default async function GraphPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ focus?: string }>;
 }) {
   const { id } = await params;
+  const { focus } = await searchParams;
   const [batch, graph] = await Promise.all([
     api.batch(id),
     api.graph(id, "?limit=180"),
@@ -41,7 +44,7 @@ export default async function GraphPage({
             description="Reconcile this batch to populate the graph."
           />
         ) : (
-          <EvidenceGraph graph={graph} />
+          <EvidenceGraph graph={graph} initialFocusId={focus ?? null} />
         )}
       </Card>
     </div>

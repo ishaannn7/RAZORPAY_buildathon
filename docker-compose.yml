@@ -1,0 +1,40 @@
+# Docker path for ReconProof. This is an alternative to the `make setup &&
+# make demo && make api && make web` workflow in the README, not a
+# replacement for it — both start from the same source and the same default
+# configuration (SQLite, no LLM, no network at runtime).
+#
+#   docker compose up --build
+#   docker compose exec api reconproof demo   # seed the held-out demo dataset
+#
+# Then open http://localhost:43917.
+services:
+  api:
+    build:
+      context: ./apps/api
+    ports:
+      - "8817:8817"
+    environment:
+      RECONPROOF_DATA_DIR: /data
+      RECONPROOF_CORS_ORIGINS: '["http://localhost:43917","http://127.0.0.1:43917"]'
+    volumes:
+      - reconproof-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8817/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_BASE: http://localhost:8817
+    ports:
+      - "43917:43917"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  reconproof-data:
