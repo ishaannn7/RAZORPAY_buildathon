@@ -385,6 +385,26 @@ class PolicyVersionSummary(ApiModel):
     document: dict[str, Any] = Field(default_factory=dict)
 
 
+class RazorpaySyncRequest(BaseModel):
+    batch_id: str
+    from_time: datetime
+    to_time: datetime
+
+
+class RazorpaySyncResult(ApiModel):
+    batch_id: str
+    payments: SourceFileSummary | None = None
+    refunds: SourceFileSummary | None = None
+
+
+class WebhookIngestResult(ApiModel):
+    batch_id: str
+    event: str
+    accepted: bool
+    duplicate: bool
+    source: SourceFileSummary | None = None
+
+
 class HealthResponse(BaseModel):
     status: str
     database: str

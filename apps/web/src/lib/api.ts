@@ -79,6 +79,12 @@ export type BatchDetail = BatchSummary & {
   model_version: string | null;
 };
 
+export type RazorpaySyncResult = {
+  batch_id: string;
+  payments: SourceFileSummary | null;
+  refunds: SourceFileSummary | null;
+};
+
 export type RecordSummary = {
   id: string;
   source_kind: string;

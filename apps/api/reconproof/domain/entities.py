@@ -222,6 +222,9 @@ class AuditAction(StrEnum):
     MODEL_PROMOTION_APPROVED = "model_promotion_approved"
     MODEL_PROMOTION_REJECTED = "model_promotion_rejected"
     EXPORT_GENERATED = "export_generated"
+    RAZORPAY_SYNC_COMPLETED = "razorpay_sync_completed"
+    WEBHOOK_RECEIVED = "webhook_received"
+    WEBHOOK_SIGNATURE_REJECTED = "webhook_signature_rejected"
 
 
 class Actor(StrEnum):

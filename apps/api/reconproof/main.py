@@ -17,6 +17,7 @@ from reconproof.api.routes import (
     batches,
     exceptions,
     exports,
+    integrations,
     models,
     monitoring,
     policies,
@@ -77,6 +78,8 @@ def create_app() -> FastAPI:
     app.include_router(monitoring.router, prefix="/api")
     app.include_router(models.router, prefix="/api")
     app.include_router(policies.router, prefix="/api")
+    app.include_router(integrations.integrations_router, prefix="/api")
+    app.include_router(integrations.webhooks_router, prefix="/api")
 
     @app.get("/api/health", response_model=HealthResponse, tags=["meta"])
     def health(

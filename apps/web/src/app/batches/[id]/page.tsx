@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { BatchNav } from "@/components/batch-nav";
+import { RazorpaySync } from "@/components/razorpay-sync";
 import { RunBatchButton } from "@/components/run-batch";
 import {
   Badge,
@@ -51,6 +52,58 @@ export default async function BatchOverviewPage({
         <BatchNav batch={batch} active="overview" />
         <RunBatchButton batchId={batch.id} status={batch.status} />
       </div>
+
+      <Card>
+        <CardHeader
+          title="Source files"
+          description="Content-addressed on ingest, so a byte-identical re-upload is recognised and ignored."
+          action={<RazorpaySync batchId={batch.id} />}
+        />
+        <Table>
+          <thead>
+            <tr>
+              <Th>Source</Th>
+              <Th>File</Th>
+              <Th align="right">Rows accepted</Th>
+              <Th align="right">Rejected</Th>
+              <Th align="right">Size</Th>
+              <Th>SHA-256</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {batch.sources.map((source) => (
+              <tr key={source.id}>
+                <Td className="whitespace-nowrap text-ink">
+                  {titleize(source.source_kind)}
+                </Td>
+                <Td>
+                  <Mono>{source.filename}</Mono>
+                </Td>
+                <Td align="right" className="tabular">
+                  {count(source.accepted_rows)}
+                </Td>
+                <Td align="right" className="tabular">
+                  {source.rejected_rows > 0 ? (
+                    <span className="text-blocked">
+                      {count(source.rejected_rows)}
+                    </span>
+                  ) : (
+                    <span className="text-ink-3">0</span>
+                  )}
+                </Td>
+                <Td align="right" className="tabular">
+                  {bytes(source.byte_size)}
+                </Td>
+                <Td>
+                  <Mono title={source.content_sha256}>
+                    {source.content_sha256.slice(0, 12)}
+                  </Mono>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Card>
 
       {metrics ? (
         <>
@@ -227,57 +280,6 @@ export default async function BatchOverviewPage({
               </CardBody>
             </Card>
           </div>
-
-          <Card>
-            <CardHeader
-              title="Source files"
-              description="Content-addressed on ingest, so a byte-identical re-upload is recognised and ignored."
-            />
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Source</Th>
-                  <Th>File</Th>
-                  <Th align="right">Rows accepted</Th>
-                  <Th align="right">Rejected</Th>
-                  <Th align="right">Size</Th>
-                  <Th>SHA-256</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {batch.sources.map((source) => (
-                  <tr key={source.id}>
-                    <Td className="whitespace-nowrap text-ink">
-                      {titleize(source.source_kind)}
-                    </Td>
-                    <Td>
-                      <Mono>{source.filename}</Mono>
-                    </Td>
-                    <Td align="right" className="tabular">
-                      {count(source.accepted_rows)}
-                    </Td>
-                    <Td align="right" className="tabular">
-                      {source.rejected_rows > 0 ? (
-                        <span className="text-blocked">
-                          {count(source.rejected_rows)}
-                        </span>
-                      ) : (
-                        <span className="text-ink-3">0</span>
-                      )}
-                    </Td>
-                    <Td align="right" className="tabular">
-                      {bytes(source.byte_size)}
-                    </Td>
-                    <Td>
-                      <Mono title={source.content_sha256}>
-                        {source.content_sha256.slice(0, 12)}
-                      </Mono>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card>
 
           <Card>
             <CardHeader title="Records by canonical kind" />

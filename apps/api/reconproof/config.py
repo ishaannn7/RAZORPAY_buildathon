@@ -83,6 +83,20 @@ class Settings(BaseSettings):
     drift_risk_tightening: float = 0.5
     anomaly_contamination: float = 0.05
 
+    # ---- razorpay integration -----------------------------------------------
+    #: Test-mode (or live) key pair. Absent by default: the demo is fully
+    #: functional on file uploads alone, so a missing key disables only the
+    #: optional sync endpoint rather than anything the product depends on.
+    razorpay_key_id: str | None = None
+    razorpay_key_secret: str | None = None
+    #: Required to accept webhook deliveries. Verification fails closed: no
+    #: secret configured means every webhook is rejected, not accepted
+    #: unverified, mirroring how the policy engine fails closed when its
+    #: document is unavailable.
+    razorpay_webhook_secret: str | None = None
+    razorpay_api_base_url: str = "https://api.razorpay.com/v1"
+    razorpay_sync_timeout_seconds: float = 30.0
+
     @property
     def resolved_database_url(self) -> str:
         if self.database_url:
