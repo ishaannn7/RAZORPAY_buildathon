@@ -519,3 +519,48 @@ class TestDeterministicProvider:
             assert outcome.recommendation["requires_human_approval"] is True  # type: ignore[attr-defined]
             # Awaiting approval, never resolved by the agent itself.
             assert exception.status is ExceptionStatus.AWAITING_APPROVAL
+
+
+class TestAgentCompletionRate:
+    """PRD §13's "agent completion within limits >= 95%" as a measured rate,
+    not just a single-case proof that the capability exists.
+
+    "Completes within limits" means the investigation reaches a real,
+    budget-respecting verdict (RECOMMENDED or ABSTAINED) rather than bailing
+    out (TOOL_FAILURE, INVALID_OUTPUT) — the same distinction the single-case
+    tests above already draw, just measured across every exception a
+    realistically-sized batch produces instead of one hand-picked exception.
+    """
+
+    def test_completion_rate_across_a_full_batch_meets_target(
+        self, db: Session, settings: Settings, tmp_path: Path
+    ) -> None:
+        # Same scale as the PRD's own held-out evaluation (n_orders=1000), so
+        # this measures the rate on a realistically-sized, realistically-messy
+        # batch rather than a handful of hand-picked exceptions.
+        batch, _truth = materialize_dataset(
+            db, DatasetSpec(name="completion-rate", seed=7007, n_orders=1000), tmp_path / "rate"
+        )
+        ReconciliationPipeline(db, settings=settings).run(batch)
+        db.commit()
+
+        exceptions = list(
+            db.execute(
+                select(ReconciliationException).where(ReconciliationException.batch_id == batch.id)
+            ).scalars()
+        )
+        assert len(exceptions) >= 20, "batch too small to measure a rate meaningfully"
+
+        completed_within_limits = {AgentOutcome.RECOMMENDED, AgentOutcome.ABSTAINED}
+        outcomes: dict[AgentOutcome, int] = {}
+        for exception in exceptions:
+            investigator = Investigator(db, settings=settings, provider=DeterministicProvider())
+            outcome = investigator.investigate(exception)
+            db.commit()
+            outcomes[outcome.outcome] = outcomes.get(outcome.outcome, 0) + 1  # type: ignore[attr-defined]
+
+        completed = sum(
+            count for outcome, count in outcomes.items() if outcome in completed_within_limits
+        )
+        rate = completed / len(exceptions)
+        assert rate >= 0.95, f"completion rate {rate:.2%} below the 95% target; outcomes={outcomes}"
