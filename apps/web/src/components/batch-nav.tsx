@@ -35,7 +35,7 @@ export function BatchNav({
           {count(batch.record_count)} records · {money(batch.unresolved)} unresolved
         </span>
       </div>
-      <nav className="flex flex-wrap gap-1 border-b border-line pb-2">
+      <nav aria-label="Batch sections" className="flex flex-wrap gap-1 border-b border-line pb-2">
         <NavLink href={base} active={active === "overview"}>
           Overview
         </NavLink>

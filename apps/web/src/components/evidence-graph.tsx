@@ -75,10 +75,15 @@ export function EvidenceGraph({
         </span>
       </div>
 
+      {/* A visually-hidden orientation note rather than `role="img"` on the SVG
+          below: the graph's nodes are real keyboard-operable controls, and
+          `role="img"` would collapse them into a flat picture for assistive
+          tech, making them unreachable. */}
+      <p className="sr-only">
+        {`Evidence graph with ${graph.nodes.length} records and ${graph.edges.length} links. Tab through the records below to select one and see its links.`}
+      </p>
       <div className="overflow-x-auto rounded-lg border border-line bg-canvas/60">
         <svg
-          role="img"
-          aria-label={`Evidence graph with ${graph.nodes.length} records and ${graph.edges.length} links`}
           width={layout.width}
           height={layout.height}
           viewBox={`0 0 ${layout.width} ${layout.height}`}
@@ -130,19 +135,28 @@ export function EvidenceGraph({
               if (!position) return null;
               const dimmed = neighbours !== null && !neighbours.has(node.id);
               const isSelected = selected === node.id;
+              const nodeLabel = `${titleize(node.kind)} ${
+                node.reference ?? node.id
+              }, ${money(node.amount)}${isSelected ? ", selected" : ""}`;
               return (
                 <g
                   key={node.id}
                   transform={`translate(${position.x}, ${position.y})`}
                   onClick={() => setSelected(isSelected ? null : node.id)}
-                  className="cursor-pointer"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelected(isSelected ? null : node.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  aria-label={nodeLabel}
+                  className="cursor-pointer focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
                   opacity={dimmed ? 0.25 : 1}
                 >
-                  <title>
-                    {`${titleize(node.kind)} ${node.reference ?? node.id}\n${money(
-                      node.amount,
-                    )}`}
-                  </title>
+                  <title>{nodeLabel}</title>
                   <rect
                     width={NODE_WIDTH}
                     height={NODE_HEIGHT}
@@ -156,6 +170,7 @@ export function EvidenceGraph({
                   <text
                     x={8}
                     y={12}
+                    aria-hidden
                     className="fill-[var(--color-ink-3)] text-[8px] uppercase"
                     style={{ letterSpacing: "0.05em" }}
                   >
@@ -164,6 +179,7 @@ export function EvidenceGraph({
                   <text
                     x={8}
                     y={23}
+                    aria-hidden
                     className="fill-[var(--color-ink)] text-[10px] font-medium"
                     style={{ fontVariantNumeric: "tabular-nums" }}
                   >

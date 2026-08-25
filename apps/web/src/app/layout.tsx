@@ -72,7 +72,7 @@ export default function RootLayout({
               <span className="hidden text-xs text-ink-3 sm:inline">
                 Evidence-linked financial reconciliation
               </span>
-              <nav className="ml-auto flex items-center gap-3">
+              <nav aria-label="Primary" className="ml-auto flex items-center gap-3">
                 <Link
                   href="/ingest"
                   className="text-xs font-medium text-ink-3 transition-colors hover:text-ink"

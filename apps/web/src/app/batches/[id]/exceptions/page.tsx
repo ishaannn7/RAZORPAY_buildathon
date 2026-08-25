@@ -58,7 +58,9 @@ export default async function ExceptionQueuePage({
                 <Th>Subject</Th>
                 <Th>What is unresolved</Th>
                 <Th>Agent</Th>
-                <Th />
+                <Th>
+                  <span className="sr-only">Actions</span>
+                </Th>
               </tr>
             </thead>
             <tbody>

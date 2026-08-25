@@ -306,7 +306,9 @@ export default async function BatchOverviewPage({
                     <Th>Cause</Th>
                     <Th align="right">Amount</Th>
                     <Th>Summary</Th>
-                    <Th />
+                    <Th>
+                      <span className="sr-only">Actions</span>
+                    </Th>
                   </tr>
                 </thead>
                 <tbody>
